@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from google import genai
 
@@ -10,6 +9,7 @@ st.set_page_config(
 )
 
 st.sidebar.title("⚙️ Cấu hình hệ thống")
+# Để trống ô nhập, tránh việc GitHub quét lỗi bảo mật
 user_api_key = st.sidebar.text_input(
     "Nhập Gemini API Key của bạn:", 
     value="", 
@@ -19,20 +19,16 @@ st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
 st.sidebar.markdown("Hệ thống tự động chấm bài Viết và Nói Tiếng Anh THCS theo chuẩn GDPT 2018.")
 
-# Cấu hình biến môi trường chuẩn theo Option 1 trong tài liệu chính thức của Google
-if user_api_key:
-    os.environ["GEMINI_API_KEY"] = user_api_key
-
 st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Nói & Viết Tiếng Anh THCS")
 st.markdown("*Ứng dụng hỗ trợ giáo viên và học sinh kiểm tra, đánh giá bài tập tự động, phân tích chi tiết lỗi sai trên nền tảng Internet.*")
 st.markdown("---")
 
 if not user_api_key:
-    st.warning("⚠️ Vui lòng nhập Google Gemini API Key ở thanh bên trái (Sidebar) để hệ thống hoạt động!")
+    st.warning("⚠️ Vui lòng nhập Google Gemini API Key của bạn ở thanh bên trái (Sidebar) để hệ thống hoạt động!")
 else:
     try:
-        # Khởi tạo client không truyền trực tiếp tham số để SDK tự nhận diện biến môi trường theo khuyến nghị
-        client = genai.Client()
+        # Khởi tạo client trực tiếp với key người dùng nhập trên giao diện
+        client = genai.Client(api_key=user_api_key)
         
         tab1, tab2 = st.tabs(["📝 Chấm bài Kỹ năng Viết (Writing)", "🎤 Chấm bài Kỹ năng Nói (Speaking)"])
 
