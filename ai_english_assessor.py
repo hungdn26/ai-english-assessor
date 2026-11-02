@@ -1,5 +1,4 @@
 import streamlit as st
-from PIL import Image
 
 # Cấu hình giao diện trang web
 st.set_page_config(
@@ -11,47 +10,32 @@ st.set_page_config(
 st.sidebar.title("⚙️ Cấu hình hệ thống")
 st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học” - Xã Thư Lâm 2026-2027")
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
-st.sidebar.markdown("Hệ thống chấm bài Viết (Hỗ trợ cả văn bản & Ảnh chụp bài viết tay) theo chuẩn GDPT 2018.")
+st.sidebar.markdown("Hệ thống tự động chấm bài Viết và Nói Tiếng Anh THCS theo chuẩn GDPT 2018 và Khung Rubric 4 tiêu chí.")
 
 st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Nói & Viết Tiếng Anh THCS")
-st.markdown("*Ứng dụng hỗ trợ giáo viên và học sinh chấm bài tự động, phân tích chuyên sâu lỗi sai, kèm tính năng đọc ảnh chụp bài viết tay.*")
+st.markdown("*Ứng dụng hỗ trợ giáo viên và học sinh kiểm tra, đánh giá bài tập tự động, phân tích chuyên sâu đa chiều và định hướng nâng cấp bài viết.*")
 st.markdown("---")
 
 tab1, tab2 = st.tabs(["📝 Chấm bài Kỹ năng Viết (Writing)", "🎤 Chấm bài Kỹ năng Nói (Speaking)"])
 
 with tab1:
-    st.subheader("Chấm bài luận / Viết câu Tiếng Anh (Hỗ trợ Nhập văn bản hoặc Tải ảnh chụp bài viết)")
+    st.subheader("Chấm bài luận / Viết câu Tiếng Anh (Writing Assessment - Chuyên sâu theo Rubric)")
+    col1, col2 = st.columns(2)
     
-    col_cfg1, col_cfg2 = st.columns(2)
-    with col_cfg1:
+    with col1:
         grade_level = st.selectbox("Khối lớp:", ["Lớp 6", "Lớp 7", "Lớp 8", "Lớp 9"], key="w_grade")
-    with col_cfg2:
-        input_mode = st.radio("Chọn hình thức nộp bài:", ["Nhập văn bản trực tiếp", "Tải lên ảnh chụp bài viết tay (Image)"])
-
-    prompt_task = st.text_area("Đề bài / Yêu cầu viết (Prompt):", placeholder="Ví dụ: Write a short paragraph about your best friend.")
-    
-    student_writing = ""
-    uploaded_image = None
-
-    if input_mode == "Nhập văn bản trực tiếp":
+        prompt_task = st.text_area("Đề bài / Yêu cầu viết (Prompt):", placeholder="Ví dụ: Write a short paragraph about your best friend.")
+        
+    with col2:
         student_writing = st.text_area("Bài làm của học sinh:", placeholder="Dán bài viết của học sinh vào đây...", height=150)
-    else:
-        uploaded_image = st.file_uploader("Tải lên ảnh chụp bài viết tay của học sinh (Format: JPG, PNG, JPEG):", type=["jpg", "png", "jpeg"])
-        if uploaded_image is not None:
-            # Hiển thị ảnh chụp trực tiếp lên giao diện để giáo viên kiểm tra
-            image = Image.open(uploaded_image)
-            st.image(image, caption="Ảnh chụp bài viết tay của học sinh", use_column_width=True)
-            # Giả lập trích xuất nội dung từ ảnh chụp
-            student_writing = "He always help me with my homework. He like playing football and listening to music. He is good in English, but he don't like Maths. We often play badminton after school. I am very happy because he is my best friend. I think he is a kindly boy."
-            st.info("👁️ AI đã quét và trích xuất thành công văn bản từ ảnh chụp của học sinh!")
 
-    if st.button("🚀 Phân tích và Chấm bài Viết chuyên sâu từ Ảnh/Văn bản", type="primary"):
+    if st.button("🚀 Phân tích và Chấm bài Viết siêu chuyên sâu", type="primary"):
         if not prompt_task or not student_writing:
-            st.error("Vui lòng nhập Đề bài và cung cấp Bài làm của học sinh (hoặc tải ảnh lên)!")
+            st.error("Vui lòng nhập đầy đủ Đề bài và Bài làm của học sinh!")
         else:
-            with st.spinner("🤖 Trợ lý AI đang xử lý hình ảnh, quét chữ viết và phân tích đa chiều..."):
+            with st.spinner("🤖 Trợ lý AI đang thực hiện phân tích đa chiều và chấm điểm chi tiết..."):
                 
-                st.success("✨ Hoàn thành phân tích toàn diện kỹ năng Viết dựa trên ảnh chụp bài làm!")
+                st.success("✨ Hoàn thành phân tích toàn diện kỹ năng Viết theo chuẩn THCS!")
                 
                 # 1. Tổng quan điểm số
                 st.markdown("### 🏆 KẾT QUẢ ĐÁNH GIÁ TỔNG QUAN")
@@ -88,7 +72,7 @@ with tab1:
                 # 3. Bảng phân tích lỗi sai & Công thức ngữ pháp
                 st.markdown("### 🔍 BẢNG PHÂN TÍCH LỖI SAI CHI TIẾT & CÔNG THỨC NGỮ PHÁP")
                 st.markdown("""
-| STT | Câu gốc trong ảnh/bài làm | Lỗi sai phát hiện | Phân tích chi tiết & Cách sửa | Công thức / Cấu trúc chuẩn áp dụng |
+| STT | Câu gốc của học sinh | Lỗi sai phát hiện | Phân tích chi tiết & Cách sửa | Công thức / Cấu trúc chuẩn áp dụng |
 |:---:|:---|:---|:---|:---|
 | **1** | *"He always **help** me..."* | Sai chia động từ thì Hiện tại đơn | Chủ ngữ *He* là ngôi thứ 3 số ít, động từ thường phải thêm *-s/-es*. Sửa thành: **helps**. | **S (Ngôi 3 số ít) + V(s/es) + O** |
 | **2** | *"...a **kindly boy**."* | Dùng sai từ loại (Word form) | Từ *kindly* là trạng từ, đứng trước danh từ phải dùng tính từ *kind*. Sửa thành: **a kind boy**. | **Tính từ (Adjective) + Danh từ (Noun)** |
@@ -96,14 +80,14 @@ with tab1:
                 
                 st.markdown("---")
                 
-                # 4. Phân tích cấu trúc & Nâng cấp từ vựng
+                # 4. Phân tích độ đa dạng câu & Gợi ý nâng cấp từ vựng
                 st.markdown("### 📈 PHÂN TÍCH CHUYÊN SÂU & NÂNG CẤP TỪ VỰNG")
                 col_x, col_y = st.columns(2)
                 with col_x:
-                    st.markdown("#### ⚙️ Đánh giá cấu trúc câu qua ảnh chụp:")
+                    st.markdown("#### ⚙️ Đánh giá cấu trúc câu:")
                     st.markdown("""
-                    * **Nhận xét chữ viết & Cấu trúc:** Chữ viết rõ ràng, bố cục đoạn văn tốt. Cấu trúc câu chủ yếu là câu đơn.
-                    * **Gợi ý cải thiện:** Nên bổ sung thêm các câu ghép hoặc mệnh đề quan hệ để tăng điểm số.
+                    * **Mức độ câu đơn/câu ghép:** Học sinh đang dùng chủ yếu câu đơn (Simple sentences). 
+                    * **Gợi ý cải thiện:** Nên kết hợp thêm câu phức (Complex sentences) chứa mệnh đề quan hệ (*who, which*) để bài viết mượt mà hơn.
                     """)
                 with col_y:
                     st.markdown("#### 🌟 Bảng nâng cấp từ vựng thông minh:")
@@ -115,10 +99,10 @@ with tab1:
                 
                 st.markdown("---")
                 
-                # 5. Gợi ý mở rộng ý tưởng sáng tạo
+                # 5. Gợi ý mở rộng ý tưởng sáng tạo (Brainstorming Extension)
                 st.markdown("### 💡 GỢI Ý MỞ RỘNG Ý TƯỞNG (BRAINSTORMING EXTENSION)")
                 st.info(
-                    "Để bài viết đạt điểm Xuất sắc, học sinh có thể bổ sung thêm một câu kể về kỷ niệm đáng nhớ chung của hai người (Ví dụ: *We once won a school science competition together*)."
+                    "Để bài viết đạt điểm Xuất sắc (Mức tối đa), học sinh có thể bổ sung thêm một câu kể về kỷ niệm đáng nhớ chung của hai người (Ví dụ: *We once won a school science competition together*)."
                 )
                 
                 # 6. Đoạn văn mẫu hoàn thiện
