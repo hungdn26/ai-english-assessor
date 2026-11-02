@@ -1,26 +1,25 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 
 # Cấu hình giao diện trang web
 st.set_page_config(
-    page_title="AI English Assessment Assistant - Thư Lâm",
-    page_icon="🤖",
+    page_title="Trợ lý AI Tiếng Anh THCS - Thư Lâm",
+    page_icon="🎯",
     layout="wide"
 )
 
-# Cài đặt sẵn API Key trực tiếp (để không phải nhập lại mỗi lần chạy)
-genai.configure(api_key="AQ.Ab8RN6IEq5Qy7TK8-cIBcsgiVdSi6iLW-CsiJB3c_vxQg_UXQg")
-model = genai.GenerativeModel('gemini-3.8-flash')
+# Khởi tạo client kết nối chuẩn bằng thư viện google-genai mới nhất với API Key của anh
+client = genai.Client(api_key="AQ.Ab8RN6Lqx5FO5hswKqZGvXqXq7fWiJVdq2FQo66BNzqvCBulw")
 
 # Thanh bên (Sidebar) hướng dẫn
-st.sidebar.title("⚙️ Hướng dẫn")
+st.sidebar.title("⚙️ Hướng dẫn sử dụng")
 st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học” - Xã Thư Lâm 2026-2027")
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
-st.sidebar.markdown("Trợ lý ảo tự động chấm bài Viết và Nói Tiếng Anh THCS, phân tích lỗi sai và gợi ý cải thiện theo chuẩn GDPT 2018.")
+st.sidebar.markdown("Hệ thống tự động chấm bài Viết và Nói Tiếng Anh THCS, phân tích lỗi sai và gợi ý cải thiện theo chuẩn GDPT 2018.")
 
 # Tiêu đề chính
 st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Nói & Viết Tiếng Anh THCS")
-st.markdown("*Ứng dụng hỗ trợ giáo viên chấm bài tự động, phân tích lỗi ngữ pháp, phát âm theo chuẩn GDPT 2018.*")
+st.markdown("*Ứng dụng hỗ trợ giáo viên và học sinh kiểm tra, đánh giá bài tập tự động, phân tích chi tiết lỗi sai trên nền tảng Internet.*")
 st.markdown("---")
 
 # Chọn tab chức năng: Kỹ năng Viết hoặc Nói
@@ -54,7 +53,10 @@ with tab1:
                     3. **Phân tích lỗi sai chi tiết (Error Analysis):** Chỉ ra rõ các lỗi chính tả, ngữ pháp, cấu trúc câu và giải thích tại sao sai.
                     4. **Gợi ý sửa đổi (Suggested Revision):** Viết lại đoạn văn mẫu đạt điểm cao, phù hợp lứa tuổi học sinh THCS.
                     """
-                    response = model.generate_content(prompt_content)
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt_content,
+                    )
                     st.success("✨ Hoàn thành chấm bài!")
                     st.markdown(response.text)
                 except Exception as e:
@@ -88,7 +90,10 @@ with tab2:
                     3. **Lỗi ngữ pháp & Cấu trúc cần khắc phục:** Chỉ ra lỗi sai cụ thể trong câu nói.
                     4. **Gợi ý cải thiện (Model Answer):** Cung cấp câu trả lời mẫu tự nhiên, hay hơn cho học sinh luyện tập.
                     """
-                    response = model.generate_content(speaking_prompt)
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=speaking_prompt,
+                    )
                     st.success("✨ Hoàn thành chấm bài Nói!")
                     st.markdown(response.text)
                 except Exception as e:
