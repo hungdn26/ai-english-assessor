@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from google import genai
 
@@ -9,15 +10,18 @@ st.set_page_config(
 )
 
 st.sidebar.title("⚙️ Cấu hình hệ thống")
-# Lấy trực tiếp khóa từ ô nhập liệu hoặc biến cấu hình sẵn
 user_api_key = st.sidebar.text_input(
     "Nhập Gemini API Key của bạn:", 
-    value="AQ.Ab8RN6Lqx5FO5hswKqZGvXqXq7fWiJVdq2FQo66BNzqvCBulw", 
+    value="", 
     type="password"
 )
 st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học” - Xã Thư Lâm 2026-2027")
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
 st.sidebar.markdown("Hệ thống tự động chấm bài Viết và Nói Tiếng Anh THCS theo chuẩn GDPT 2018.")
+
+# Cấu hình biến môi trường chuẩn theo Option 1 trong tài liệu chính thức của Google
+if user_api_key:
+    os.environ["GEMINI_API_KEY"] = user_api_key
 
 st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Nói & Viết Tiếng Anh THCS")
 st.markdown("*Ứng dụng hỗ trợ giáo viên và học sinh kiểm tra, đánh giá bài tập tự động, phân tích chi tiết lỗi sai trên nền tảng Internet.*")
@@ -27,8 +31,8 @@ if not user_api_key:
     st.warning("⚠️ Vui lòng nhập Google Gemini API Key ở thanh bên trái (Sidebar) để hệ thống hoạt động!")
 else:
     try:
-        # Khởi tạo client chuẩn chính thức theo tài liệu Google GenAI
-        client = genai.Client(api_key=user_api_key)
+        # Khởi tạo client không truyền trực tiếp tham số để SDK tự nhận diện biến môi trường theo khuyến nghị
+        client = genai.Client()
         
         tab1, tab2 = st.tabs(["📝 Chấm bài Kỹ năng Viết (Writing)", "🎤 Chấm bài Kỹ năng Nói (Speaking)"])
 
@@ -47,9 +51,9 @@ else:
                 if not prompt_task or not student_writing:
                     st.error("Vui lòng nhập đầy đủ Đề bài và Bài làm của học sinh!")
                 else:
-                    with st.spinner("🤖 AI đang phân tích ngữ pháp, từ vựng và cấu trúc bài viết..."):
+                    with st.spinner("🤖 AI đang phân tích bài viết..."):
                         prompt_content = f"""
-                        Bạn là một giáo viên và chuyên gia khảo thí Tiếng Anh THCS tại Việt Nam. Hãy chấm điểm và nhận xét bài viết sau đây của học sinh khối {grade_level}.
+                        Là giáo viên và chuyên gia khảo thí Tiếng Anh THCS tại Việt Nam, hãy chấm điểm và nhận xét bài viết sau đây của học sinh khối {grade_level}.
                         Đề bài: {prompt_task}
                         Bài làm của học sinh: {student_writing}
                         
@@ -81,9 +85,9 @@ else:
                 if not s_prompt or not transcript_text:
                     st.error("Vui lòng nhập Đề bài và Nội dung bài nói của học sinh!")
                 else:
-                    with st.spinner("🤖 AI đang phân tích độ trôi chảy, từ vựng và phát âm..."):
+                    with st.spinner("🤖 AI đang phân tích bài nói..."):
                         speaking_prompt = f"""
-                        Bạn là một giám khảo khảo thí Tiếng Anh chuyên nghiệp cấp THCS. Hãy đánh giá bài nói dựa trên transcript sau của học sinh khối {s_grade}.
+                        Là một giám khảo khảo thí Tiếng Anh chuyên nghiệp cấp THCS, hãy đánh giá bài nói dựa trên transcript sau của học sinh khối {s_grade}.
                         Đề bài nói: {s_prompt}
                         Nội dung bài nói (Transcript): {transcript_text}
                         
