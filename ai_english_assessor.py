@@ -36,8 +36,9 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 def call_gemini_rest_api(prompt_text):
-    """Hàm gọi REST API trực tiếp đến Google Gemini, không qua thư viện bên thứ ba để tránh lỗi tương thích"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={FIXED_GEMINI_API_KEY}"
+    """Hàm gọi REST API trực tiếp đến Google Gemini bằng model gemini-3.8-flash chính thức"""
+    # Sử dụng đúng tên model chuẩn được hệ thống yêu cầu
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={FIXED_GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{
@@ -49,7 +50,6 @@ def call_gemini_rest_api(prompt_text):
         response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
         if response.status_code == 200:
             res_json = response.json()
-            # Trích xuất nội dung trả về từ AI
             return res_json['candidates'][0]['content']['parts'][0]['text']
         else:
             return f"Lỗi API (Mã {response.status_code}): {response.text}"
@@ -76,7 +76,6 @@ with tab1:
         else:
             with st.spinner("🤖 Trợ lý AI đang đọc hiểu, soi từng lỗi ngữ pháp và lập bảng phân tích chi tiết..."):
                 
-                # Xây dựng câu lệnh chuyên sâu yêu cầu AI đọc đúng bài làm thực tế
                 ai_prompt = f"""
                 Bạn là một chuyên gia khảo thí và giáo viên Tiếng Anh THCS tại Việt Nam. Hãy chấm điểm và phân tích bài viết thực tế sau của học sinh {student_name} (Khối {grade_level}) dựa trên Khung Rubric 4 tiêu chí IELTS chuẩn (Task Achievement, Coherence & Cohesion, Lexical Resource, Grammatical Range & Accuracy).
                 
@@ -85,24 +84,20 @@ with tab1:
                 
                 Hãy trả về kết quả bằng tiếng Việt theo định dạng Markdown rõ ràng gồm các phần sau:
                 1. **🏆 KẾT QUẢ ĐÁNH GIÁ TỔNG QUAN:** Điểm tổng kết (thang 10) và điểm chi tiết 4 tiêu chí (mỗi tiêu chí thang 2.5).
-                2. **🔍 BẢNG CHI TIẾT LỖI SAI TRONG BÀI:** Lập bảng gồm các cột: [STT | Trích đoạn câu gốc có lỗi trong bài | Loại lỗi | Phân tích bản chất lỗi | Hướng sửa đúng | Cấu trúc ngữ pháp áp dụng]. Nếu bài có lỗi nào phải chỉ ra đúng lỗi đó, tuyệt đối không bịa đặt.
+                2. **🔍 BẢNG CHI TIẾT LỖI SAI TRONG BÀI:** Lập bảng gồm các cột: [STT | Trích đoạn câu gốc có lỗi trong bài | Loại lỗi | Phân tích bản chất lỗi | Hướng sửa đúng | Cấu trúc ngữ pháp áp dụng]. Phải chỉ ra đúng các lỗi thực tế có trong bài.
                 3. **📈 GỢI Ý NÂNG CẤP TỪ VỰNG:** Đề xuất các từ vựng/cụm từ nâng cao phù hợp với đúng chủ đề của đề bài này.
                 4. **💡 ĐOẠN VĂN MẪU HOÀN THIỆN:** Viết lại đoạn văn hoàn chỉnh, sửa sạch lỗi, mượt mà nhưng giữ nguyên ý tưởng cốt lõi của học sinh.
                 """
                 
-                # Gọi trực tiếp qua REST API
                 ai_result = call_gemini_rest_api(ai_prompt)
                 
                 if "Lỗi" in ai_result[:10]:
                     st.error(f"⚠️ {ai_result}")
                 else:
                     st.success(f"✨ AI đã hoàn thành phân tích chuyên sâu cho học sinh: **{student_name}**!")
-                    
-                    # Hiển thị kết quả phân tích trực tiếp ngay trên trang
                     st.markdown("---")
                     st.markdown(ai_result)
                     
-                    # Lưu kết quả vào lịch sử để xuất Excel
                     result_record = {
                         "Thời gian": datetime.now().strftime("%Y-%m-%d %H:%M"),
                         "Họ và Tên": student_name,
