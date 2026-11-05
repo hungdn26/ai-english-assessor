@@ -1,8 +1,9 @@
 import streamlit as st
-from PIL import Image
 import pandas as pd
 from datetime import datetime
 import io
+import requests
+import json
 
 # Cấu hình giao diện trang web
 st.set_page_config(
@@ -15,14 +16,17 @@ st.set_page_config(
 if 'student_results' not in st.session_state:
     st.session_state.student_results = []
 
+# Gán sẵn API Key chính thức của anh
+FIXED_GEMINI_API_KEY = "AQ.Ab8RN6IsSIaBnPMumFQGL-Vfu-xR4oZCkhauEVCts7Bto-EWcw"
+
 st.sidebar.title("⚙️ Cấu hình hệ thống")
-st.sidebar.success("💡 Chế độ hiển thị kết quả trực tiếp")
+st.sidebar.success("🔑 Đã kết nối API AI chuyên sâu")
 st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học” - Xã Thư Lâm 2026-2027")
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
-st.sidebar.markdown("Hệ thống chấm bài thông minh, hiển thị kết quả chi tiết ngay trên giao diện và xuất file Excel.")
+st.sidebar.markdown("Hệ thống chấm bài Viết & Nói thông minh, gọi AI phân tích sâu sát từng lỗi sai và xuất file Excel.")
 
 st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Nói & Viết Tiếng Anh THCS")
-st.markdown("*Ứng dụng phân tích và hiển thị kết quả đánh giá chuyên sâu trực tiếp ngay trên trang web.*")
+st.markdown("*Ứng dụng kết nối trực tiếp với mô hình AI Google Gemini để bóc tách toàn diện lỗi sai, chấm điểm chuyên sâu theo Rubric chuẩn.*")
 st.markdown("---")
 
 tab1, tab2, tab3 = st.tabs([
@@ -31,8 +35,29 @@ tab1, tab2, tab3 = st.tabs([
     "📊 Thống kê & Xuất Bảng Điểm"
 ])
 
+def call_gemini_rest_api(prompt_text):
+    """Hàm gọi REST API trực tiếp đến Google Gemini, không qua thư viện bên thứ ba để tránh lỗi tương thích"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={FIXED_GEMINI_API_KEY}"
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt_text}]
+        }]
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+        if response.status_code == 200:
+            res_json = response.json()
+            # Trích xuất nội dung trả về từ AI
+            return res_json['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"Lỗi API (Mã {response.status_code}): {response.text}"
+    except Exception as e:
+        return f"Lỗi kết nối mạng: {str(e)}"
+
 with tab1:
-    st.subheader("Chấm bài luận / Viết câu Tiếng Anh (Hiển thị kết quả trực tiếp)")
+    st.subheader("Chấm bài luận / Viết câu Tiếng Anh (Phân tích chuyên sâu bằng AI thật)")
     
     col_info1, col_info2, col_info3 = st.columns(3)
     with col_info1:
@@ -42,95 +67,51 @@ with tab1:
     with col_info3:
         grade_level = st.selectbox("Khối lớp chương trình:", ["Lớp 6", "Lớp 7", "Lớp 8", "Lớp 9"], key="w_grade")
 
-    input_mode = st.radio("Chọn hình thức cung cấp bài làm:", ["Nhập văn bản trực tiếp", "Tải lên ảnh chụp bài viết tay (Image)"])
-    prompt_task = st.text_area("Đề bài / Yêu cầu viết (Prompt):", placeholder="Ví dụ: Write a paragraph about your best friend.")
-    
-    student_writing = ""
-    uploaded_image = None
+    prompt_task = st.text_area("Đề bài / Yêu cầu viết (Prompt):", placeholder="Ví dụ: Write a paragraph about your future house.")
+    student_writing = st.text_area("Bài làm thực tế của học sinh:", placeholder="Dán bài viết thực tế của học sinh vào đây...", height=150)
 
-    if input_mode == "Nhập văn bản trực tiếp":
-        student_writing = st.text_area("Bài làm thực tế của học sinh:", placeholder="Dán bài viết thực tế của học sinh vào đây...", height=150)
-    else:
-        uploaded_image = st.file_uploader("Tải lên ảnh chụp bài viết tay của học sinh (JPG, PNG, JPEG):", type=["jpg", "png", "jpeg"])
-        if uploaded_image is not None:
-            image = Image.open(uploaded_image)
-            st.image(image, caption=f"Ảnh chụp bài làm của học sinh: {student_name if student_name else 'Chưa rõ tên'}", use_column_width=True)
-            student_writing = st.text_area("Nội dung văn bản trích xuất từ ảnh chụp:", placeholder="Nhập văn bản từ ảnh chụp...", height=100)
-
-    if st.button("🚀 Phân tích và Hiển thị kết quả ngay lập tức", type="primary"):
+    if st.button("🚀 Gửi AI phân tích chuyên sâu ngay lập tức", type="primary"):
         if not student_name or not prompt_task or not student_writing:
             st.error("Vui lòng nhập đầy đủ: [Họ tên học sinh], [Đề bài] và [Bài làm thực tế]!")
         else:
-            with st.spinner("🤖 Trợ lý AI đang xử lý và tổng hợp kết quả trực tiếp..."):
+            with st.spinner("🤖 Trợ lý AI đang đọc hiểu, soi từng lỗi ngữ pháp và lập bảng phân tích chi tiết..."):
                 
-                # Tính toán sơ bộ điểm số dựa trên độ dài và bài làm thực tế
-                word_count = len(student_writing.split())
-                total_score = 8.0 if word_count > 20 else 6.5
-                task_score = 2.25
-                coherence_score = 2.0
-                lexical_score = 2.0
-                grammar_score = 1.75
+                # Xây dựng câu lệnh chuyên sâu yêu cầu AI đọc đúng bài làm thực tế
+                ai_prompt = f"""
+                Bạn là một chuyên gia khảo thí và giáo viên Tiếng Anh THCS tại Việt Nam. Hãy chấm điểm và phân tích bài viết thực tế sau của học sinh {student_name} (Khối {grade_level}) dựa trên Khung Rubric 4 tiêu chí IELTS chuẩn (Task Achievement, Coherence & Cohesion, Lexical Resource, Grammatical Range & Accuracy).
                 
-                # Lưu vào lịch sử để xuất Excel
-                result_record = {
-                    "Thời gian": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "Họ và Tên": student_name,
-                    "Lớp": student_class,
-                    "Đề bài": prompt_task,
-                    "Bài làm": student_writing,
-                    "Tổng điểm": total_score,
-                    "Xếp loại": "Giỏi" if total_score >= 8.0 else "Khá"
-                }
-                st.session_state.student_results.append(result_record)
+                - Đề bài thực tế: {prompt_task}
+                - Bài làm thực tế của học sinh: {student_writing}
                 
-                st.success(f"✨ Hoàn thành phân tích cho học sinh: **{student_name}** ({student_class})!")
+                Hãy trả về kết quả bằng tiếng Việt theo định dạng Markdown rõ ràng gồm các phần sau:
+                1. **🏆 KẾT QUẢ ĐÁNH GIÁ TỔNG QUAN:** Điểm tổng kết (thang 10) và điểm chi tiết 4 tiêu chí (mỗi tiêu chí thang 2.5).
+                2. **🔍 BẢNG CHI TIẾT LỖI SAI TRONG BÀI:** Lập bảng gồm các cột: [STT | Trích đoạn câu gốc có lỗi trong bài | Loại lỗi | Phân tích bản chất lỗi | Hướng sửa đúng | Cấu trúc ngữ pháp áp dụng]. Nếu bài có lỗi nào phải chỉ ra đúng lỗi đó, tuyệt đối không bịa đặt.
+                3. **📈 GỢI Ý NÂNG CẤP TỪ VỰNG:** Đề xuất các từ vựng/cụm từ nâng cao phù hợp với đúng chủ đề của đề bài này.
+                4. **💡 ĐOẠN VĂN MẪU HOÀN THIỆN:** Viết lại đoạn văn hoàn chỉnh, sửa sạch lỗi, mượt mà nhưng giữ nguyên ý tưởng cốt lõi của học sinh.
+                """
                 
-                # HIỂN THỊ KẾT QUẢ TRỰC TIẾP NGAY TRÊN TRANG
-                st.markdown("---")
-                st.markdown(f"### 🏆 KẾT QUẢ ĐÁNH GIÁ CHI TIẾT CHO: {student_name.upper()}")
-                st.info(f"📝 **Đề bài:** {prompt_task}\n\n📝 **Bài làm thực tế:** \"{student_writing}\"")
+                # Gọi trực tiếp qua REST API
+                ai_result = call_gemini_rest_api(ai_prompt)
                 
-                # Các chỉ số điểm số dạng metric
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Điểm Tổng Kết", f"{total_score} / 10", "Giỏi / Khá")
-                m2.metric("Task Achievement", f"{task_score} / 2.5", "Tốt")
-                m3.metric("Coherence", f"{coherence_score} / 2.5", "Khá")
-                m4.metric("Grammar & Lexicon", f"{lexical_score + grammar_score} / 5.0", "Ổn định")
-                
-                st.markdown("---")
-                st.markdown("### 📊 ĐÁNH GIÁ 4 TIÊU CHÍ IELTS - THCS")
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown(f"**1. Task Achievement:** {task_score} / 2.5 đ")
-                    st.progress(0.9)
-                    st.caption(f"Học sinh đã triển khai các ý bám sát chủ đề yêu cầu của đề bài.")
+                if "Lỗi" in ai_result[:10]:
+                    st.error(f"⚠️ {ai_result}")
+                else:
+                    st.success(f"✨ AI đã hoàn thành phân tích chuyên sâu cho học sinh: **{student_name}**!")
                     
-                    st.markdown(f"**2. Coherence & Cohesion:** {coherence_score} / 2.5 đ")
-                    st.progress(0.8)
-                    st.caption("Bố cục bài viết mạch lạc, các câu liên kết tương đối tốt.")
-                with col_b:
-                    st.markdown(f"**3. Lexical Resource:** {lexical_score} / 2.5 đ")
-                    st.progress(0.8)
-                    st.caption(f"Từ vựng phong phú, phù hợp với trình độ học sinh khối {grade_level}.")
+                    # Hiển thị kết quả phân tích trực tiếp ngay trên trang
+                    st.markdown("---")
+                    st.markdown(ai_result)
                     
-                    st.markdown(f"**4. Grammatical Range & Accuracy:** {grammar_score} / 2.5 đ")
-                    st.progress(0.7)
-                    st.caption("Sử dụng được các cấu trúc câu cơ bản, có một vài điểm cần tinh chỉnh nhỏ.")
-                
-                st.markdown("---")
-                st.markdown("### 🔍 BẢNG PHÂN TÍCH LỖI SAI VÀ HƯỚNG DẪN SỬA ĐỔI")
-                st.markdown("""
-| STT | Trích đoạn trong bài | Loại lỗi | Phân tích chi tiết bản chất lỗi | Hướng sửa đúng | Cấu trúc ngữ pháp áp dụng |
-|:---:|:---|:---|:---|:---|:---|
-| **1** | *(Dựa trên bài viết thực tế)* | Gợi ý cải thiện từ vựng | Có thể mở rộng thêm các tính từ miêu tả biểu cảm để bài viết sinh động hơn. | Nâng cấp từ vựng | **Adjective + Noun / Linking Verb + Adj** |
-                """)
-                
-                st.markdown("---")
-                st.markdown("### 💡 ĐOẠN VĂN MẪU HOÀN THIỆN (SUGGESTED REVISION)")
-                st.success(
-                    f"Dựa trên chính nội dung bài làm của em **{student_name}**, dưới đây là phiên bản trau chuốt, hoàn chỉnh giúp đạt điểm số cao nhất:\n\n"
-                    f"\"{student_writing} (Đã được hệ thống rà soát cấu trúc câu, tinh chỉnh ngữ pháp và nâng cấp từ vựng mượt mà theo chuẩn chương trình GDPT 2018).\""
-                )
+                    # Lưu kết quả vào lịch sử để xuất Excel
+                    result_record = {
+                        "Thời gian": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Họ và Tên": student_name,
+                        "Lớp": student_class,
+                        "Đề bài": prompt_task,
+                        "Bài làm": student_writing,
+                        "Trạng thái": "Đã AI chấm chuyên sâu"
+                    }
+                    st.session_state.student_results.append(result_record)
 
 with tab2:
     st.subheader("Chấm bài Nói Tiếng Anh (Speaking Assessment)")
@@ -138,33 +119,36 @@ with tab2:
     s_prompt = st.text_area("Đề bài nói (Speaking Prompt):", placeholder="Ví dụ: Talk about your favorite hobby.")
     transcript_text = st.text_area("Nội dung lời nói thực tế (Transcript):", placeholder="Nhập transcript thực tế của học sinh...", height=150)
 
-    if st.button("🚀 Phân tích bài Nói trực tiếp", type="primary"):
+    if st.button("🚀 AI phân tích bài Nói chuyên sâu", type="primary"):
         if not s_name or not s_prompt or not transcript_text:
             st.error("Vui lòng nhập đầy đủ [Họ tên], [Đề bài nói] và [Transcript]!")
         else:
-            st.success(f"✨ Hoàn thành phân tích bài Nói cho em **{s_name}**!")
-            st.markdown(f"🎤 **Đề bài:** {s_prompt}")
-            st.markdown(f"📝 **Transcript:** \"{transcript_text}\"")
-            st.markdown("""
-            ### 📊 ĐÁNH GIÁ CHI TIẾT KỸ NĂNG NÓI
-            * **Điểm tổng quan:** 8.5 / 10.0 điểm (Mức: Giỏi)
-            * **Phát âm & Lưu loát:** Phát âm rõ ràng, ngữ điệu tự nhiên, phản hồi tốt yêu cầu đề bài.
-            """)
+            with st.spinner("🤖 Trợ lý AI đang phân tích bài nói thực tế..."):
+                speaking_prompt = f"""
+                Là giám khảo khảo thí Tiếng Anh THCS, hãy đánh giá bài nói thực tế sau của học sinh {s_name}:
+                - Đề bài nói: {s_prompt}
+                - Transcript thực tế: {transcript_text}
+                
+                Hãy trả về kết quả bằng tiếng Việt gồm: Điểm tổng quan, nhận xét chi tiết phát âm/từ vựng/ngữ pháp dựa trên chính transcript này, và câu trả lời mẫu cải thiện.
+                """
+                speaking_result = call_gemini_rest_api(speaking_prompt)
+                
+                if "Lỗi" in speaking_result[:10]:
+                    st.error(f"⚠️ {speaking_result}")
+                else:
+                    st.success(f"✨ Hoàn thành phân tích bài Nói cho em **{s_name}**!")
+                    st.markdown("---")
+                    st.markdown(speaking_result)
 
 with tab3:
     st.subheader("📊 Quản lý kết quả học tập & Thống kê điểm số")
-    st.markdown("Danh sách toàn bộ các bài làm thực tế của học sinh đã được hệ thống ghi nhận và lưu trữ:")
+    st.markdown("Danh sách toàn bộ các bài làm thực tế của học sinh đã được hệ thống AI chấm điểm và lưu trữ:")
     
     if len(st.session_state.student_results) == 0:
-        st.info("ℹ️ Chưa có dữ liệu bài làm nào. Vui lòng thực hiện chấm bài ở tab 'Kỹ năng Viết'.")
+        st.info("ℹ️ Chưa có dữ liệu bài làm nào được chấm. Vui lòng chấm bài ở tab 'Chấm bài Kỹ năng Viết'.")
     else:
         df_results = pd.DataFrame(st.session_state.student_results)
         st.dataframe(df_results, use_container_width=True)
-        
-        col_st1, col_st2, col_st3 = st.columns(3)
-        col_st1.metric("Tổng số bài đã chấm", len(df_results))
-        col_st2.metric("Điểm trung bình chung", f"{df_results['Tổng điểm'].mean():.2f} / 10")
-        col_st3.metric("Điểm cao nhất", f"{df_results['Tổng điểm'].max()} / 10")
         
         st.markdown("---")
         
