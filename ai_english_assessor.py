@@ -17,13 +17,13 @@ if 'student_results' not in st.session_state:
     st.session_state.student_results = []
 
 st.sidebar.title("⚙️ Cấu hình hệ thống")
-st.sidebar.success("💡 Chế độ nhúng iframe AI thông minh")
+st.sidebar.success("💡 Chế độ liên kết AI thông minh")
 st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học” - Xã Thư Lâm 2026-2027")
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
-st.sidebar.markdown("Hệ thống quản lý bài làm, định danh học sinh, xuất file Excel và kết nối trực tiếp với trung tâm xử lý Gemini AI.")
+st.sidebar.markdown("Hệ thống quản lý bài làm, định danh học sinh, xuất file Excel và tích hợp trợ lý AI.")
 
 st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Nói & Viết Tiếng Anh THCS")
-st.markdown("*Ứng dụng kết hợp giao diện quản lý chuẩn chuyên môn sư phạm và nhúng công cụ xử lý thông minh từ Gemini AI.*")
+st.markdown("*Ứng dụng kết hợp giao diện quản lý chuyên môn sư phạm và công cụ phân tích AI chuyên sâu.*")
 st.markdown("---")
 
 tab1, tab2, tab3 = st.tabs([
@@ -33,7 +33,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 with tab1:
-    st.subheader("Chấm bài luận / Viết câu Tiếng Anh (Giao diện nhập liệu & Nhúng AI xử lý)")
+    st.subheader("Chấm bài luận / Viết câu Tiếng Anh (Định danh & Kết nối AI)")
     
     col_info1, col_info2, col_info3 = st.columns(3)
     with col_info1:
@@ -44,7 +44,7 @@ with tab1:
         grade_level = st.selectbox("Khối lớp chương trình:", ["Lớp 6", "Lớp 7", "Lớp 8", "Lớp 9"], key="w_grade")
 
     input_mode = st.radio("Chọn hình thức cung cấp bài làm:", ["Nhập văn bản trực tiếp", "Tải lên ảnh chụp bài viết tay (Image)"])
-    prompt_task = st.text_area("Đề bài / Yêu cầu viết (Prompt):", placeholder="Ví dụ: Write a paragraph about your future house.")
+    prompt_task = st.text_area("Đề bài / Yêu cầu viết (Prompt):", placeholder="Ví dụ: Write a paragraph about your best friend.")
     
     student_writing = ""
     uploaded_image = None
@@ -56,9 +56,9 @@ with tab1:
         if uploaded_image is not None:
             image = Image.open(uploaded_image)
             st.image(image, caption=f"Ảnh chụp bài làm của học sinh: {student_name if student_name else 'Chưa rõ tên'}", use_column_width=True)
-            student_writing = st.text_area("Nội dung văn bản trích xuất từ ảnh chụp (hoặc nhập nội dung):", placeholder="Nhập văn bản từ ảnh chụp...", height=100)
+            student_writing = st.text_area("Nội dung văn bản trích xuất từ ảnh chụp:", placeholder="Nhập văn bản từ ảnh chụp...", height=100)
 
-    if st.button("🚀 Tạo khung xử lý AI & Lưu kết quả vào hệ thống", type="primary"):
+    if st.button("🚀 Tạo gói dữ liệu & Mở trung tâm phân tích AI", type="primary"):
         if not student_name or not prompt_task or not student_writing:
             st.error("Vui lòng nhập đầy đủ: [Họ tên học sinh], [Đề bài] và [Bài làm thực tế]!")
         else:
@@ -71,33 +71,32 @@ with tab1:
                 "Lớp": student_class,
                 "Đề bài": prompt_task,
                 "Bài làm": student_writing,
-                "Trạng thái": "Đã tạo khung AI tích hợp"
+                "Trạng thái": "Đã xử lý & Lưu trữ"
             }
             st.session_state.student_results.append(result_record)
             
             st.markdown("---")
-            st.markdown("### 🤖 KẾT QUẢ PHÂN TÍCH CHUYÊN SÂU TỪ TRUNG TÂM GEMINI AI")
-            st.info("💡 *Hệ thống đã tự động cấu trúc câu hỏi theo Khung Rubric 4 tiêu chí chuẩn THCS và truyền tải vào khung giao diện xử lý bên dưới:*")
+            st.markdown("### 📋 ĐÓNG GÓI CÂU LỆNH (PROMPT) CHẤM BÀI CHUYÊN SÂU")
             
-            # Tạo câu lệnh (prompt) tự động từ dữ liệu người dùng nhập để nhúng vào iframe hoặc hiển thị trực quan
-            full_prompt_query = f"Chấm bài và phân tích chi tiết theo Rubric 4 tiêu chí cho học sinh {student_name} khối {grade_level}. Đề bài: {prompt_task}. Bài làm: {student_writing}"
-            encoded_query = urllib.parse.quote(full_prompt_query)
+            # Xây dựng nội dung prompt chuẩn chuyên môn
+            prompt_content = f"""Hãy đóng vai trò là một giám khảo khảo thí Tiếng Anh THCS tại Việt Nam. Hãy chấm điểm và phân tích bài viết sau của học sinh {student_name} (Lớp {student_class}, {grade_level}) dựa trên Khung Rubric 4 tiêu chí IELTS (Task Achievement, Coherence & Cohesion, Lexical Resource, Grammatical Range & Accuracy):
+
+- Đề bài: {prompt_task}
+- Bài làm của học sinh: {student_writing}
+
+Yêu cầu kết quả trả về bằng tiếng Việt gồm: Điểm tổng quan (thang 10), chi tiết 4 tiêu chí, bảng phân tích lỗi sai chi tiết kèm cấu trúc ngữ pháp, và đoạn văn mẫu hoàn thiện."""
+
+            st.info("💡 Bạn có thể sao chép nhanh câu lệnh chuẩn dưới đây để dán vào trung tâm AI, hoặc bấm nút mở nhanh bên dưới:")
+            st.code(prompt_content, language="markdown")
             
-            # Hiển thị khung nhúng iframe (hoặc khung tương tác trực tiếp giao diện Google/Gemini web)
-            # Có thể nhúng trực tiếp trang web trợ lý AI hoặc khung chat web
-            embed_url = f"https://gemini.google.com/"
-            
-            st.markdown(f"""
-            <div style="border: 2px dashed #4F46E5; padding: 15px; border-radius: 10px; background-color: #F8FAFC;">
-                <p style="font-weight: bold; color: #1E293B;">📋 Nội dung yêu cầu AI xử lý:</p>
-                <p style="background: white; padding: 10px; border-radius: 5px; border: 1px solid #E2E8F0;">{full_prompt_query}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            # Nhúng iframe giao diện tương tác AI
-            st.components.v1.iframe(embed_url, height=600, scrolling=True)
+            # Nút liên kết mở nhanh sang Gemini web
+            st.markdown(
+                f'<a href="https://gemini.google.com/" target="_blank">'
+                f'<button style="background-color:#4F46E5; color:white; padding:12px 20px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">'
+                f'🔗 Mở ngay trang chủ Gemini AI để phân tích'
+                f'</button></a>',
+                unsafe_allow_html=True
+            )
 
 with tab2:
     st.subheader("Chấm bài Nói Tiếng Anh (Speaking Assessment)")
@@ -105,12 +104,20 @@ with tab2:
     s_prompt = st.text_area("Đề bài nói (Speaking Prompt):", placeholder="Ví dụ: Talk about your favorite hobby.")
     transcript_text = st.text_area("Nội dung lời nói thực tế (Transcript):", placeholder="Nhập transcript thực tế của học sinh...", height=150)
 
-    if st.button("🚀 Mở khung AI phân tích bài Nói", type="primary"):
+    if st.button("🚀 Tạo gói dữ liệu bài Nói", type="primary"):
         if not s_name or not s_prompt or not transcript_text:
             st.error("Vui lòng nhập đầy đủ [Họ tên], [Đề bài nói] và [Transcript]!")
         else:
             st.success(f"✨ Đã đóng gói bài nói cho em **{s_name}**!")
-            st.components.v1.iframe("https://gemini.google.com/", height=600, scrolling=True)
+            speaking_query = f"Đánh giá bài nói Tiếng Anh cho học sinh {s_name}. Đề bài: {s_prompt}. Transcript: {transcript_text}"
+            st.code(speaking_query, language="markdown")
+            st.markdown(
+                f'<a href="https://gemini.google.com/" target="_blank">'
+                f'<button style="background-color:#4F46E5; color:white; padding:12px 20px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">'
+                f'🔗 Mở ngay Gemini AI để phân tích bài Nói'
+                f'</button></a>',
+                unsafe_allow_html=True
+            )
 
 with tab3:
     st.subheader("📊 Quản lý kết quả học tập & Thống kê điểm số")
