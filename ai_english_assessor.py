@@ -15,11 +15,9 @@ st.set_page_config(
 if 'student_results' not in st.session_state:
     st.session_state.student_results = []
 
-# Gán sẵn API Key chính thức của anh
-FIXED_GEMINI_API_KEY = "AQ.Ab8RN6IsSIaBnPMumFQGL-Vfu-xR4oZCkhauEVCts7Bto-EWcw"
-
 st.sidebar.title("⚙️ Cấu hình hệ thống")
-st.sidebar.success("🔑 Đã kết nối Interactions API")
+# Cho phép anh nhập chính xác API Key của mình vào ô này
+user_api_key = st.sidebar.text_input("Nhập Gemini API Key của bạn:", type="password", placeholder="Dán API Key vào đây...")
 st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học” - Xã Thư Lâm 2026-2027")
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
 st.sidebar.markdown("Hệ thống tích hợp Interactions API chuẩn (`gemini-3.8-flash`), chấm sâu từng lỗi sai và xuất file Excel.")
@@ -49,13 +47,15 @@ with tab1:
     student_writing = st.text_area("Bài làm thực tế của học sinh:", placeholder="Dán bài viết thực tế của học sinh vào đây...", height=150)
 
     if st.button("🚀 Gửi AI phân tích chuyên sâu (Interactions API)", type="primary"):
-        if not student_name or not prompt_task or not student_writing:
+        if not user_api_key:
+            st.error("⚠️ Vui lòng nhập Gemini API Key ở thanh sidebar bên trái trước khi chấm bài!")
+        elif not student_name or not prompt_task or not student_writing:
             st.error("Vui lòng nhập đầy đủ: [Họ tên học sinh], [Đề bài] và [Bài làm thực tế]!")
         else:
             with st.spinner("🤖 Trợ lý AI đang xử lý qua Interactions API (`gemini-3.8-flash`)..."):
                 try:
-                    # Khởi tạo client chuẩn theo tài liệu chính thức
-                    client = genai.Client(api_key=FIXED_GEMINI_API_KEY)
+                    # Khởi tạo client với API key thực tế do anh cung cấp
+                    client = genai.Client(api_key=user_api_key)
                     
                     ai_prompt = f"""
                     Bạn là một chuyên gia khảo thí và giáo viên Tiếng Anh THCS tại Việt Nam. Hãy chấm điểm và phân tích bài viết thực tế sau của học sinh {student_name} (Khối {grade_level}) dựa trên Khung Rubric 4 tiêu chí IELTS chuẩn (Task Achievement, Coherence & Cohesion, Lexical Resource, Grammatical Range & Accuracy).
@@ -70,7 +70,6 @@ with tab1:
                     4. **💡 ĐOẠN VĂN MẪU HOÀN THIỆN:** Viết lại đoạn văn hoàn chỉnh, sửa sạch lỗi, mượt mà nhưng giữ nguyên ý tưởng cốt lõi của học sinh.
                     """
                     
-                    # Sử dụng cú pháp chuẩn từ tài liệu: client.interactions.create với model gemini-3.8-flash
                     interaction = client.interactions.create(
                         model="gemini-3.8-flash",
                         input=ai_prompt
@@ -93,7 +92,7 @@ with tab1:
                     st.session_state.student_results.append(result_record)
                     
                 except Exception as e:
-                    st.error(f"Lỗi khi gọi Interactions API: {str(e)}")
+                    st.error(f"Lỗi xác thực hoặc gọi Interactions API: {str(e)}")
 
 with tab2:
     st.subheader("Chấm bài Nói Tiếng Anh (Speaking Assessment)")
@@ -102,12 +101,14 @@ with tab2:
     transcript_text = st.text_area("Nội dung lời nói thực tế (Transcript):", placeholder="Nhập transcript thực tế của học sinh...", height=150)
 
     if st.button("🚀 AI phân tích bài Nói (Interactions API)", type="primary"):
-        if not s_name or not s_prompt or not transcript_text:
+        if not user_api_key:
+            st.error("⚠️ Vui lòng nhập Gemini API Key ở thanh sidebar bên trái!")
+        elif not s_name or not s_prompt or not transcript_text:
             st.error("Vui lòng nhập đầy đủ [Họ tên], [Đề bài nói] và [Transcript]!")
         else:
             with st.spinner("🤖 Trợ lý AI đang phân tích bài nói..."):
                 try:
-                    client = genai.Client(api_key=FIXED_GEMINI_API_KEY)
+                    client = genai.Client(api_key=user_api_key)
                     speaking_prompt = f"""
                     Là giám khảo khảo thí Tiếng Anh THCS, hãy đánh giá bài nói thực tế sau của học sinh {s_name}:
                     - Đề bài nói: {s_prompt}
