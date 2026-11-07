@@ -22,7 +22,7 @@ st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
 st.sidebar.markdown("Hệ thống tích hợp chuẩn `gemini-3.8-flash`, hỗ trợ chấm bài qua văn bản và ảnh chụp bài viết tay theo Rubric.")
 
-st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Viết Tiếng Anh THCS")
+st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng viết Tiếng Anh THCS")
 st.markdown("*Ứng dụng hỗ trợ chấm bài thông minh theo Khung Rubric chuẩn, kết nối trực tiếp mô hình gemini-3.8-flash.*")
 st.markdown("---")
 
