@@ -2,7 +2,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import io
+import time
+from PIL import Image
 from google import genai
+from google.genai.errors import APIError
 
 # Cấu hình giao diện trang web
 st.set_page_config(
@@ -16,14 +19,13 @@ if 'student_results' not in st.session_state:
     st.session_state.student_results = []
 
 st.sidebar.title("⚙️ Cấu hình hệ thống")
-# Ô nhập API Key của anh
 user_api_key = st.sidebar.text_input("Nhập Gemini API Key của bạn:", type="password", placeholder="Dán API Key vào đây...")
 st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học” - Xã Thư Lâm 2026-2027")
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
-st.sidebar.markdown("Hệ thống tích hợp Interactions API chuẩn (`gemini-3.8-flash`), chấm sâu theo Rubric chuẩn và xuất file Excel.")
+st.sidebar.markdown("Hệ thống tích hợp Interactions API chuẩn (`gemini-3.8-flash`), có cơ chế tự động thử lại khi nghẽn mạng.")
 
 st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Nói & Viết Tiếng Anh THCS")
-st.markdown("*Ứng dụng áp dụng Khung Rubric chuẩn, kết nối Interactions API để phân tích chuyên sâu, bóc tách lỗi sai và hiển thị kết quả trực tiếp.*")
+st.markdown("*Ứng dụng hỗ trợ chấm bài thông minh, tích hợp cơ chế tự động chống nghẽn mạng theo Khung Rubric chuẩn.*")
 st.markdown("---")
 
 tab1, tab2, tab3 = st.tabs([
@@ -32,8 +34,28 @@ tab1, tab2, tab3 = st.tabs([
     "📊 Thống kê & Xuất Bảng Điểm"
 ])
 
+def call_gemini_with_retry(client, prompt_input, max_retries=3):
+    """Hàm tự động gọi lại (Retry) nếu gặp lỗi quá tải 503 từ server Google"""
+    delay = 2
+    for attempt in range(max_retries):
+        try:
+            interaction = client.interactions.create(
+                model="gemini-3.8-flash",
+                input=prompt_input
+            )
+            return interaction.output_text
+        except Exception as e:
+            # Kiểm tra nếu là lỗi quá tải (503 / Service Unavailable)
+            error_str = str(e)
+            if "503" in error_str or "service_unavailable" in error_str or "high demand" in error_str:
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                    delay *= 2 # Tăng thời gian chờ theo cấp số nhân
+                    continue
+            raise e # Nếu lỗi khác hoặc hết số lần thử thì bắn ngoại lệ ra ngoài
+
 with tab1:
-    st.subheader("Chấm bài luận / Viết câu Tiếng Anh theo Khung Rubric chuẩn")
+    st.subheader("Chấm bài luận / Viết câu Tiếng Anh (Hỗ trợ Ảnh chụp & Văn bản)")
     
     col_info1, col_info2, col_info3 = st.columns(3)
     with col_info1:
@@ -43,45 +65,53 @@ with tab1:
     with col_info3:
         grade_level = st.selectbox("Khối lớp chương trình:", ["Lớp 6", "Lớp 7", "Lớp 8", "Lớp 9"], key="w_grade")
 
-    # Gắn key riêng biệt để kiểm soát trạng thái dữ liệu nhập vào
     prompt_task = st.text_area("Đề bài / Yêu cầu viết (Prompt):", placeholder="Ví dụ: Write a paragraph about your future house.", key="w_prompt_task")
-    student_writing = st.text_area("Bài làm thực tế của học sinh:", placeholder="Dán bài viết thực tế của học sinh vào đây...", height=150, key="w_student_writing")
+    
+    input_method = st.radio("Chọn hình thức cung cấp bài làm của học sinh:", ["Nhập văn bản trực tiếp", "Tải lên ảnh chụp bài viết tay (Image)"], key="w_input_method")
+    
+    uploaded_image = None
+    student_writing_text = ""
 
-    if st.button("🚀 Gửi AI chấm điểm theo Rubric chuyên sâu", type="primary"):
+    if input_method == "Nhập văn bản trực tiếp":
+        student_writing_text = st.text_area("Bài làm thực tế của học sinh:", placeholder="Dán bài viết thực tế của học sinh vào đây...", height=150, key="w_student_writing")
+    else:
+        uploaded_image = st.file_uploader("Tải lên ảnh chụp bài viết tay của học sinh (Định dạng: JPG, PNG, JPEG):", type=["jpg", "png", "jpeg"], key="w_uploaded_image")
+        if uploaded_image is not None:
+            image_obj = Image.open(uploaded_image)
+            st.image(image_obj, caption=f"Ảnh bài làm của học sinh: {student_name if student_name else 'Chưa rõ tên'}", use_column_width=True)
+
+    if st.button("🚀 Gửi AI phân tích chuyên sâu theo Rubric", type="primary"):
         if not user_api_key:
             st.error("⚠️ Vui lòng nhập Gemini API Key ở thanh sidebar bên trái trước khi chấm bài!")
-        elif not student_name or not prompt_task or not student_writing:
-            st.error("Vui lòng nhập đầy đủ: [Họ tên học sinh], [Đề bài] và [Bài làm thực tế]!")
+        elif not student_name or not prompt_task or (input_method == "Nhập văn bản trực tiếp" and not student_writing_text) or (input_method == "Tải lên ảnh chụp bài viết tay (Image)" and uploaded_image is None):
+            st.error("Vui lòng nhập đầy đủ thông tin: [Họ tên], [Đề bài] và [Bài làm / Ảnh chụp bài viết]!")
         else:
-            with st.spinner("🤖 Trợ lý AI đang áp dụng Khung Rubric chấm điểm chi tiết và bóc tách lỗi..."):
+            with st.spinner("🤖 Trợ lý AI đang xử lý (tự động kết nối và tối ưu đường truyền)..."):
                 try:
                     client = genai.Client(api_key=user_api_key)
                     
-                    ai_prompt = f"""
-                    Bạn là một giáo viên Tiếng Anh THCS chuyên môn cao tại Việt Nam. Hãy chấm điểm và phân tích bài viết thực tế sau của học sinh {student_name} ({grade_level}, chương trình Global Success) dựa chính xác trên Khung Rubric 4 tiêu chí sau (Thang điểm 10, mỗi tiêu chí 2.5 điểm):
+                    base_instruction = f"""
+                    Bạn là một giáo viên Tiếng Anh THCS chuyên môn cao tại Việt Nam. Hãy chấm điểm và phân tích bài viết của học sinh {student_name} ({grade_level}, chương trình Global Success) dựa chính xác trên Khung Rubric 4 tiêu chí sau (Thang điểm 10, mỗi tiêu chí 2.5 điểm):
                     
-                    1. Task Achievement / Response (Hoàn thành yêu cầu đề bài - 2.5đ): Đánh giá độ đáp ứng yêu cầu đề, độ dài, bố cục ý chính, mức độ phát triển ý và mở rộng sáng tạo phù hợp lứa tuổi.
-                    2. Coherence & Cohesion (Tính mạch lạc & Liên kết - 2.5đ): Đánh giá bố cục (Mở, Thân, Kết) và cách sử dụng từ nối (first, moreover, however, and, but, because...).
-                    3. Lexical Resource (Từ vựng - 2.5đ): Đánh giá sự đa dạng từ vựng theo chủ điểm, collocations, word form và lỗi chính tả.
-                    4. Grammatical Range & Accuracy (Ngữ pháp - 2.5đ): Đánh giá cấu trúc câu (đơn, ghép, phức theo cấp độ {grade_level}) và lỗi ngữ pháp (thì, mạo từ, số ít/nhiều, giới từ).
+                    1. Task Achievement / Response (Hoàn thành yêu cầu đề bài - 2.5đ): Đáp ứng yêu cầu đề, độ dài, bố cục ý chính, mức độ phát triển ý và mở rộng sáng tạo.
+                    2. Coherence & Cohesion (Tính mạch lạc & Liên kết - 2.5đ): Bố cục (Mở, Thân, Kết) và cách sử dụng từ nối (first, moreover, however, and, but, because...).
+                    3. Lexical Resource (Từ vựng - 2.5đ): Sự đa dạng từ vựng theo chủ điểm, collocations, word form và lỗi chính tả.
+                    4. Grammatical Range & Accuracy (Ngữ pháp - 2.5đ): Cấu trúc câu (đơn, ghép, phức theo cấp độ {grade_level}) và lỗi ngữ pháp (thì, mạo từ, số ít/nhiều, giới từ).
                     
                     - Đề bài thực tế: {prompt_task}
-                    - Bài làm thực tế của học sinh: {student_writing}
-                    
-                    Hãy trả về kết quả bằng tiếng Việt theo định dạng Markdown rõ ràng gồm:
-                    1. **🏆 KẾT QUẢ ĐÁNH GIÁ TỔNG QUAN:** Điểm tổng kết (thang 10), xếp loại (Xuất sắc, Khá/Tốt, Trung bình, Dưới chuẩn) và điểm chi tiết từng tiêu chí (thang 2.5đ).
-                    2. **📊 ĐÁNH GIÁ CHI TIẾT TỪNG TIÊU CHÍ:** Nhận xét rõ ràng theo đúng chuẩn Rubric cho từng tiêu chí trên.
-                    3. **🔍 BẢNG CHI TIẾT LỖI SAI TRONG BÀI:** Lập bảng gồm các cột: [STT | Trích đoạn câu gốc có lỗi | Loại lỗi | Phân tích bản chất lỗi | Hướng sửa đúng | Cấu trúc ngữ pháp áp dụng]. Phải bóc tách chính xác 100% các lỗi thực tế trong bài làm này.
-                    4. **📈 GỢI Ý NÂNG CẤP TỪ VỰNG:** Đề xuất từ vựng/cụm từ nâng cao phù hợp với chủ đề để học sinh tiến bộ.
-                    5. **💡 ĐOẠN VĂN MẪU HOÀN THIỆN:** Viết lại đoạn văn hoàn chỉnh, mượt mà bám sát ý tưởng của học sinh.
                     """
                     
-                    interaction = client.interactions.create(
-                        model="gemini-3.8-flash",
-                        input=ai_prompt
-                    )
+                    if input_method == "Nhập văn bản trực tiếp":
+                        full_input = [f"{base_instruction}\n- Bài làm thực tế của học sinh: {student_writing_text}\n\nHãy trả về kết quả bằng tiếng Việt theo định dạng Markdown rõ ràng gồm: 1. Kết quả đánh giá tổng quan & điểm chi tiết. 2. Bảng chi tiết lỗi sai trong bài [STT | Trích câu gốc có lỗi | Loại lỗi | Bản chất lỗi | Hướng sửa đúng | Cấu trúc áp dụng]. 3. Gợi ý nâng cấp từ vựng. 4. Đoạn văn mẫu hoàn thiện."]
+                    else:
+                        image_data = Image.open(uploaded_image)
+                        full_input = [
+                            f"{base_instruction}\n- Bài làm của học sinh được thể hiện trực tiếp qua ảnh chụp đính kèm. Hãy đọc kỹ nội dung viết tay trong ảnh để chấm điểm.",
+                            image_data
+                        ]
                     
-                    ai_output = interaction.output_text
+                    # Gọi hàm với cơ chế tự động thử lại khi gặp lỗi 503
+                    ai_output = call_gemini_with_retry(client, full_input)
                     
                     st.success(f"✨ AI đã hoàn thành chấm điểm theo Rubric chuẩn cho học sinh: **{student_name}**!")
                     st.markdown("---")
@@ -92,13 +122,13 @@ with tab1:
                         "Họ và Tên": student_name,
                         "Lớp": student_class,
                         "Đề bài": prompt_task,
-                        "Bài làm": student_writing,
+                        "Hình thức": "Ảnh chụp" if input_method == "Tải lên ảnh chụp bài viết tay (Image)" else "Văn bản",
                         "Trạng thái": "Đã chấm theo Rubric chuẩn"
                     }
                     st.session_state.student_results.append(result_record)
                     
                 except Exception as e:
-                    st.error(f"Lỗi khi gọi Interactions API: {str(e)}")
+                    st.error(f"⚠️ Hệ thống đang quá tải tạm thời (Lỗi 503). Vui lòng bấm gửi lại sau 1-2 giây nữa: {str(e)}")
 
 with tab2:
     st.subheader("Chấm bài Nói Tiếng Anh (Speaking Assessment)")
@@ -122,15 +152,12 @@ with tab2:
                     
                     Hãy trả về kết quả bằng tiếng Việt gồm: Điểm tổng quan, nhận xét chi tiết phát âm, từ vựng, ngữ pháp và câu trả lời mẫu cải thiện.
                     """
-                    interaction = client.interactions.create(
-                        model="gemini-3.8-flash",
-                        input=speaking_prompt
-                    )
+                    ai_output = call_gemini_with_retry(client, speaking_prompt)
                     st.success(f"✨ Hoàn thành phân tích bài Nói cho em **{s_name}**!")
                     st.markdown("---")
-                    st.markdown(interaction.output_text)
+                    st.markdown(ai_output)
                 except Exception as e:
-                    st.error(f"Lỗi khi gọi Interactions API: {str(e)}")
+                    st.error(f"⚠️ Lỗi kết nối: {str(e)}")
 
 with tab3:
     st.subheader("📊 Quản lý kết quả học tập & Thống kê điểm số")
