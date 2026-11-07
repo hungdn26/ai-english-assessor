@@ -2,10 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import io
-import time
 from PIL import Image
 from google import genai
-from google.genai.errors import APIError
 
 # Cấu hình giao diện trang web
 st.set_page_config(
@@ -22,10 +20,10 @@ st.sidebar.title("⚙️ Cấu hình hệ thống")
 user_api_key = st.sidebar.text_input("Nhập Gemini API Key của bạn:", type="password", placeholder="Dán API Key vào đây...")
 st.sidebar.info("Hội thi “Ứng dụng công nghệ AI trong trường học” - Xã Thư Lâm 2026-2027")
 st.sidebar.markdown("### 👨‍🏫 Thông tin")
-st.sidebar.markdown("Hệ thống tích hợp Interactions API chuẩn (`gemini-3.8-flash`), có cơ chế tự động thử lại khi nghẽn mạng.")
+st.sidebar.markdown("Hệ thống tích hợp chuẩn `gemini-3.8-flash`, hỗ trợ chấm bài qua văn bản và ảnh chụp bài viết tay theo Rubric.")
 
 st.title("🎯 Trợ lý ảo AI kiểm tra, đánh giá kỹ năng Nói & Viết Tiếng Anh THCS")
-st.markdown("*Ứng dụng hỗ trợ chấm bài thông minh, tích hợp cơ chế tự động chống nghẽn mạng theo Khung Rubric chuẩn.*")
+st.markdown("*Ứng dụng hỗ trợ chấm bài thông minh theo Khung Rubric chuẩn, kết nối trực tiếp mô hình gemini-3.8-flash.*")
 st.markdown("---")
 
 tab1, tab2, tab3 = st.tabs([
@@ -33,26 +31,6 @@ tab1, tab2, tab3 = st.tabs([
     "🎤 Chấm bài Kỹ năng Nói (Speaking)", 
     "📊 Thống kê & Xuất Bảng Điểm"
 ])
-
-def call_gemini_with_retry(client, prompt_input, max_retries=3):
-    """Hàm tự động gọi lại (Retry) nếu gặp lỗi quá tải 503 từ server Google"""
-    delay = 2
-    for attempt in range(max_retries):
-        try:
-            interaction = client.interactions.create(
-                model="gemini-3.8-flash",
-                input=prompt_input
-            )
-            return interaction.output_text
-        except Exception as e:
-            # Kiểm tra nếu là lỗi quá tải (503 / Service Unavailable)
-            error_str = str(e)
-            if "503" in error_str or "service_unavailable" in error_str or "high demand" in error_str:
-                if attempt < max_retries - 1:
-                    time.sleep(delay)
-                    delay *= 2 # Tăng thời gian chờ theo cấp số nhân
-                    continue
-            raise e # Nếu lỗi khác hoặc hết số lần thử thì bắn ngoại lệ ra ngoài
 
 with tab1:
     st.subheader("Chấm bài luận / Viết câu Tiếng Anh (Hỗ trợ Ảnh chụp & Văn bản)")
@@ -86,8 +64,9 @@ with tab1:
         elif not student_name or not prompt_task or (input_method == "Nhập văn bản trực tiếp" and not student_writing_text) or (input_method == "Tải lên ảnh chụp bài viết tay (Image)" and uploaded_image is None):
             st.error("Vui lòng nhập đầy đủ thông tin: [Họ tên], [Đề bài] và [Bài làm / Ảnh chụp bài viết]!")
         else:
-            with st.spinner("🤖 Trợ lý AI đang xử lý (tự động kết nối và tối ưu đường truyền)..."):
+            with st.spinner("🤖 Trợ lý AI đang đọc hiểu bài làm và áp dụng Khung Rubric chấm điểm chi tiết..."):
                 try:
+                    # Khởi tạo client chuẩn
                     client = genai.Client(api_key=user_api_key)
                     
                     base_instruction = f"""
@@ -102,16 +81,21 @@ with tab1:
                     """
                     
                     if input_method == "Nhập văn bản trực tiếp":
-                        full_input = [f"{base_instruction}\n- Bài làm thực tế của học sinh: {student_writing_text}\n\nHãy trả về kết quả bằng tiếng Việt theo định dạng Markdown rõ ràng gồm: 1. Kết quả đánh giá tổng quan & điểm chi tiết. 2. Bảng chi tiết lỗi sai trong bài [STT | Trích câu gốc có lỗi | Loại lỗi | Bản chất lỗi | Hướng sửa đúng | Cấu trúc áp dụng]. 3. Gợi ý nâng cấp từ vựng. 4. Đoạn văn mẫu hoàn thiện."]
+                        full_contents = [f"{base_instruction}\n- Bài làm thực tế của học sinh: {student_writing_text}\n\nHãy trả về kết quả bằng tiếng Việt theo định dạng Markdown rõ ràng gồm: 1. Kết quả đánh giá tổng quan & điểm chi tiết 4 tiêu chí. 2. Bảng chi tiết lỗi sai trong bài [STT | Trích câu gốc có lỗi | Loại lỗi | Bản chất lỗi | Hướng sửa đúng | Cấu trúc áp dụng]. 3. Gợi ý nâng cấp từ vựng. 4. Đoạn văn mẫu hoàn thiện."]
                     else:
                         image_data = Image.open(uploaded_image)
-                        full_input = [
-                            f"{base_instruction}\n- Bài làm của học sinh được thể hiện trực tiếp qua ảnh chụp đính kèm. Hãy đọc kỹ nội dung viết tay trong ảnh để chấm điểm.",
+                        full_contents = [
+                            f"{base_instruction}\n- Bài làm của học sinh được thể hiện trực tiếp qua ảnh chụp đính kèm. Hãy đọc kỹ nội dung viết tay trong ảnh để chấm điểm, sau đó trả kết quả chi tiết theo các phần yêu cầu.",
                             image_data
                         ]
                     
-                    # Gọi hàm với cơ chế tự động thử lại khi gặp lỗi 503
-                    ai_output = call_gemini_with_retry(client, full_input)
+                    # Sử dụng hàm chuẩn models.generate_content để gọi model gemini-3.8-flash
+                    response = client.models.generate_content(
+                        model="gemini-3.8-flash",
+                        contents=full_contents
+                    )
+                    
+                    ai_output = response.text
                     
                     st.success(f"✨ AI đã hoàn thành chấm điểm theo Rubric chuẩn cho học sinh: **{student_name}**!")
                     st.markdown("---")
@@ -128,7 +112,7 @@ with tab1:
                     st.session_state.student_results.append(result_record)
                     
                 except Exception as e:
-                    st.error(f"⚠️ Hệ thống đang quá tải tạm thời (Lỗi 503). Vui lòng bấm gửi lại sau 1-2 giây nữa: {str(e)}")
+                    st.error(f"⚠️ Lỗi khi gọi API: {str(e)}")
 
 with tab2:
     st.subheader("Chấm bài Nói Tiếng Anh (Speaking Assessment)")
@@ -152,10 +136,13 @@ with tab2:
                     
                     Hãy trả về kết quả bằng tiếng Việt gồm: Điểm tổng quan, nhận xét chi tiết phát âm, từ vựng, ngữ pháp và câu trả lời mẫu cải thiện.
                     """
-                    ai_output = call_gemini_with_retry(client, speaking_prompt)
+                    response = client.models.generate_content(
+                        model="gemini-3.8-flash",
+                        contents=speaking_prompt
+                    )
                     st.success(f"✨ Hoàn thành phân tích bài Nói cho em **{s_name}**!")
                     st.markdown("---")
-                    st.markdown(ai_output)
+                    st.markdown(response.text)
                 except Exception as e:
                     st.error(f"⚠️ Lỗi kết nối: {str(e)}")
 
